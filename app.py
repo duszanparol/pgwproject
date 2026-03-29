@@ -301,7 +301,7 @@ def create_user_markers(places):
             html.Div(f"{lat:.4f}, {lon:.4f}", className="small text-muted mb-2")
         ]
         if image_src:
-            popup_content.append(html.Img(src=image_src, style={"maxWidth": "150px", "borderRadius": "4px"}))
+            popup_content.append(html.Img(src=image_src, style={"width": "150px", "height": "auto", "borderRadius": "4px", "display": "block", "marginBottom": "8px"}))
         
         popup_content.append(html.Hr(className="my-2 border-secondary"))
         popup_content.append(dbc.ButtonGroup([
