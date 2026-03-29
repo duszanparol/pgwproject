@@ -119,23 +119,35 @@ def load_sanctuaries():
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
             
             engine = create_engine(db_url)
-            # Użyj swojej dokładnej nazwy tabeli/schematu. Skoro wcześniej było "poland_pois.sanctuary", to:
-            gdf = gpd.read_postgis("SELECT * FROM poland_pois.sanctuary", engine, geom_col="geom")
+            
+            # Najczęstsze nazwy kolumn geometrycznych to 'geom', 'geometry' lub 'way'. Próbujemy inteligentnie zgadnąć:
+            try:
+                gdf = gpd.read_postgis("SELECT * FROM poland_pois.sanctuary", engine, geom_col="geom")
+            except Exception as first_e:
+                try:
+                    gdf = gpd.read_postgis("SELECT * FROM poland_pois.sanctuary", engine, geom_col="geometry")
+                except Exception as second_e:
+                    gdf = gpd.read_postgis("SELECT * FROM poland_pois.sanctuary", engine, geom_col="way")
             
             sanctuaries = []
             seen_ids = set()
+            
+            geom_col_name = gdf.geometry.name  # Bezpieczne pobranie nazwy aktywnej kolumny geometrycznej
+            
             for index, row in gdf.iterrows():
                 sanctuary_id = str(row.get("id", f"sanctuary-{index}"))
                 if sanctuary_id in seen_ids:
                     sanctuary_id = f"{sanctuary_id}-{index}"
                 seen_ids.add(sanctuary_id)
                 
+                geom = row[geom_col_name]
+                
                 sanctuaries.append({
                     "id": sanctuary_id,
                     "name": row.get("name") or row.get("title") or f"Sanktuarium {index}",
                     "operator": row.get("operator", ""),
-                    "lat": float(row.geometry.y) if row.geometry else 0.0,
-                    "lon": float(row.geometry.x) if row.geometry else 0.0,
+                    "lat": float(geom.y) if geom else 0.0,
+                    "lon": float(geom.x) if geom else 0.0,
                     "type": "sanctuary"
                 })
                 
@@ -144,7 +156,8 @@ def load_sanctuaries():
                 "geojson": build_geojson(sanctuaries),
             }
         except Exception as e:
-            print(f"Błąd ładowania z bazy danych: {e}")
+            import traceback
+            print(f"Błąd ładowania z bazy danych PostgreSQL:\n{traceback.format_exc()}")
             pass # fallback to rest api or default
 
     try:
