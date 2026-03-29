@@ -5,11 +5,22 @@ from pathlib import Path
 from sqlalchemy import create_engine
 import geopandas as gpd
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 import requests
 from dash import Dash, Input, Output, State, ctx, dcc, html, no_update, ALL
 from dash.exceptions import PreventUpdate
+
+try:
+    from supabase import create_client, Client
+    SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", os.environ.get("SUPABASE_URL", ""))
+    SUPABASE_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", os.environ.get("SUPABASE_ANON_KEY", ""))
+    supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+except ImportError:
+    supabase_client = None
 
 APP_TITLE = "Projekt PGW"
 DEFAULT_CENTER = [52.06, 19.25]
@@ -51,6 +62,7 @@ def init_db():
             conn.execute(sqlalchemy.text("""
                 CREATE TABLE IF NOT EXISTS user_places (
                     id VARCHAR(255) PRIMARY KEY,
+                    user_id VARCHAR(255),
                     name VARCHAR(255),
                     lat FLOAT,
                     lon FLOAT,
@@ -60,12 +72,15 @@ def init_db():
 
 init_db()
 
-def load_places():
+def load_places(user_id=None):
     engine = get_engine()
-    if engine:
+    if engine and user_id:
         try:
             with engine.connect() as conn:
-                result = conn.execute(sqlalchemy.text("SELECT id, name, lat, lon, image FROM user_places"))
+                result = conn.execute(
+                    sqlalchemy.text("SELECT id, name, lat, lon, image FROM user_places WHERE user_id = :uid"),
+                    {"uid": user_id}
+                )
                 places = []
                 for row in result:
                     place = {
@@ -84,20 +99,26 @@ def load_places():
     return []
 
 
-def save_places(places):
+def save_places(places, user_id):
+    if not user_id:
+        return
+        
     engine = get_engine()
     if engine:
         try:
             with engine.begin() as conn:
-                # Clear existing and insert all (or just sync)
-                # For simplicity, we truncate and re-insert or use ON CONFLICT
-                conn.execute(sqlalchemy.text("DELETE FROM user_places"))
+                # Clear existing for THIS user only, and insert their updated places
+                conn.execute(
+                    sqlalchemy.text("DELETE FROM user_places WHERE user_id = :uid"),
+                    {"uid": user_id}
+                )
                 for place in places:
                     conn.execute(sqlalchemy.text("""
-                        INSERT INTO user_places (id, name, lat, lon, image) 
-                        VALUES (:id, :name, :lat, :lon, :image)
+                        INSERT INTO user_places (id, user_id, name, lat, lon, image) 
+                        VALUES (:id, :uid, :name, :lat, :lon, :image)
                     """), {
                         "id": place["id"],
+                        "uid": user_id,
                         "name": place.get("name"),
                         "lat": place["lat"],
                         "lon": place["lon"],
@@ -378,15 +399,14 @@ dark_input_style = {
 }
 
 def serve_layout():
-    current_places = load_places()
-    
     return dbc.Container(
         fluid=True,
         className="px-0",
         children=[
+            dcc.Store(id="user-session", storage_type="local"),
             dcc.Store(id="start-store", data=None),
             dcc.Store(id="end-store", data=None),
-            dcc.Store(id="places-store", data=current_places),
+            dcc.Store(id="places-store", data=[]),
             dcc.Store(id="add-mode-store", data=False),
             dcc.Store(id="pending-coords", data=None),
             
@@ -398,8 +418,11 @@ def serve_layout():
                     className="p-3",
                     children=[
                         html.Div([
-                            html.H4("Projekt PGW", className="mb-0 fw-bold", style={"letterSpacing": "-1px"}),
-                            html.Small("📍 Moja Mapa", className="text-muted")
+                            html.Div([
+                                html.H4("Projekt PGW", className="mb-0 fw-bold", style={"letterSpacing": "-1px"}),
+                                html.Small("📍 Moja Mapa", className="text-muted")
+                            ]),
+                            html.Div(id="auth-container", children=[dbc.Button("Zaloguj", id="btn-open-auth", size="sm", color="primary", className="shadow-none")])
                         ], className="mb-4 d-flex justify-content-between align-items-center"),
                         
                         # Routing Inputs
@@ -451,7 +474,7 @@ def serve_layout():
                             children=[
                                 dl.TileLayer(),
                                 dl.LayerGroup(id="sanctuary-markers-layer", children=create_sanctuary_markers(SANCTUARIES)),
-                                dl.LayerGroup(id="user-markers-layer", children=create_user_markers(current_places)),
+                                dl.LayerGroup(id="user-markers-layer", children=[]),
                                 dl.LayerGroup(id="route-layer"),
                                 dl.LayerGroup(id="start-icon-layer"),
                                 dl.LayerGroup(id="end-icon-layer"),
@@ -459,6 +482,23 @@ def serve_layout():
                             ]
                         ),
                         
+                        # Auth Modal
+                        dbc.Modal([
+                            dbc.ModalHeader(dbc.ModalTitle("Zaloguj się / Zarejestruj", className="text-light"), close_button=True),
+                            dbc.ModalBody([
+                                dbc.Alert(id="auth-error", color="danger", is_open=False, className="small py-2"),
+                                dbc.Label("Email:"),
+                                dbc.Input(id="auth-email", type="email", placeholder="Twój adres email", className="mb-3", style=dark_input_style),
+                                dbc.Label("Hasło:"),
+                                dbc.Input(id="auth-password", type="password", placeholder="Twoje hasło", className="mb-4", style=dark_input_style),
+                                dbc.Alert("Jeżeli nie masz konta, wpisz dane i kliknij 'Zarejestruj'. Konto zostanie automatycznie potwierdzone (jeśli Supabase jest tak skonfigurowane).", color="info", className="small py-2")
+                            ]),
+                            dbc.ModalFooter([
+                                dbc.Button("Zarejestruj", id="btn-register", color="secondary", outline=True, className="me-2"),
+                                dbc.Button("Zaloguj", id="btn-login", color="primary")
+                            ], className="border-top-0")
+                        ], id="auth-modal", is_open=False, centered=True, contentClassName="bg-dark text-light"),
+
                         # Add Place Modal
                         dbc.Modal([
                             dbc.ModalHeader(dbc.ModalTitle("Dodaj nowe miejsce"), close_button=True),
@@ -489,6 +529,89 @@ def serve_layout():
 app.layout = serve_layout
 
 
+# --- AUTH CALLBACKS ---
+
+@app.callback(
+    Output("auth-modal", "is_open"),
+    Input("btn-open-auth", "n_clicks"),
+    State("auth-modal", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_auth_modal(n1, is_open):
+    if n1: return not is_open
+    return is_open
+
+@app.callback(
+    Output("user-session", "data"),
+    Output("auth-error", "children"),
+    Output("auth-error", "is_open"),
+    Output("auth-modal", "is_open", allow_duplicate=True),
+    Input("btn-login", "n_clicks"),
+    Input("btn-register", "n_clicks"),
+    Input("btn-logout", "n_clicks"),
+    State("auth-email", "value"),
+    State("auth-password", "value"),
+    State("user-session", "data"),
+    prevent_initial_call=True
+)
+def handle_auth(n_login, n_register, n_logout, email, password, session_data):
+    trigger = ctx.triggered_id
+    if not supabase_client:
+        return no_update, "Brak poprawnej konfiguracji Supabase. Sprawdź terminal.", True, no_update
+
+    if trigger == "btn-logout":
+        try:
+            supabase_client.auth.sign_out()
+        except:
+            pass
+        return None, "", False, False
+
+    if not email or not password:
+        return no_update, "Wpisz poprawny adres e-mail oraz hasło.", True, no_update
+
+    try:
+        if trigger == "btn-login":
+            res = supabase_client.auth.sign_in_with_password({"email": email, "password": password})
+        elif trigger == "btn-register":
+            res = supabase_client.auth.sign_up({"email": email, "password": password})
+        
+        user = res.user
+        if user:
+            return {"user_id": user.id, "email": user.email}, "", False, False
+        return no_update, "Wystąpił problem przy logowaniu", True, no_update
+    except Exception as e:
+        err_msg = str(e)
+        if "Invalid login credentials" in err_msg:
+            err_msg = "Nieprawidłowe dane logowania."
+        elif "already registered" in err_msg:
+            err_msg = "Taki adres email jest już zarejestrowany."
+        return no_update, err_msg, True, no_update
+
+@app.callback(
+    Output("auth-container", "children"),
+    Input("user-session", "data")
+)
+def update_auth_ui(session_data):
+    if session_data and "user_id" in session_data:
+        return html.Div([
+            html.Span(session_data.get("email"), className="small text-light me-2"),
+            dbc.Button("Wyloguj", id="btn-logout", size="sm", color="danger", outline=True)
+        ], className="d-flex align-items-center")
+    
+    return dbc.Button("Zaloguj", id="btn-open-auth", size="sm", color="primary", className="shadow-none")
+
+@app.callback(
+    Output("places-store", "data"),
+    Output("user-markers-layer", "children"),
+    Input("user-session", "data"),
+)
+def load_user_places_on_login(session_data):
+    if session_data and "user_id" in session_data:
+        places = load_places(session_data["user_id"])
+        return places, create_user_markers(places)
+    return [], []
+
+
 # 1. Toggle Add Mode
 @app.callback(
     Output("add-mode-store", "data"),
@@ -497,9 +620,13 @@ app.layout = serve_layout
     Output("toggle-add-mode-btn", "style"),
     Input("toggle-add-mode-btn", "n_clicks"),
     State("add-mode-store", "data"),
+    State("user-session", "data"),
     prevent_initial_call=True
 )
-def toggle_add_mode(n_clicks, is_active):
+def toggle_add_mode(n_clicks, is_active, session_data):
+    if not session_data or "user_id" not in session_data:
+        return False, "⚠️ Musisz się zalogować, aby dodać miejsce", "danger", {"backgroundColor": "#242526", "borderColor": "#dc3545"}
+
     new_state = not is_active
     status = "📌 Kliknij mapę, aby dodać miejsce..." if new_state else ""
     color = "primary" if new_state else "secondary"
@@ -588,21 +715,22 @@ def handle_map_click(map_click, map_click_lat_lng, is_add_mode):
 
 # 3. Handle Add Place Form
 @app.callback(
-    Output("places-store", "data"),
-    Output("user-markers-layer", "children"),
+    Output("places-store", "data", allow_duplicate=True),
+    Output("user-markers-layer", "children", allow_duplicate=True),
     Output("add-place-modal", "is_open", allow_duplicate=True),
     Output("new-place-name", "value"),
     Output("new-place-image", "contents"),
-    Output("new-place-preview", "children"),
+    Output("new-place-preview", "children", allow_duplicate=True),
     Input("save-place-btn", "n_clicks"),
     State("pending-coords", "data"),
     State("new-place-name", "value"),
     State("new-place-image", "contents"),
     State("places-store", "data"),
+    State("user-session", "data"),
     prevent_initial_call=True
 )
-def save_new_place(n_clicks, coords, name, image, places):
-    if not coords:
+def save_new_place(n_clicks, coords, name, image, places, session_data):
+    if not coords or not session_data or "user_id" not in session_data:
         raise PreventUpdate
     
     places = places or []
@@ -615,7 +743,7 @@ def save_new_place(n_clicks, coords, name, image, places):
         "type": "user"
     }
     places.append(new_place)
-    save_places(places)
+    save_places(places, session_data["user_id"])
     
     return places, create_user_markers(places), False, "", None, ""
 
