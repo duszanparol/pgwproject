@@ -551,11 +551,13 @@ def toggle_auth_modal(n1, is_open):
     Input("btn-logout", "n_clicks"),
     State("auth-email", "value"),
     State("auth-password", "value"),
-    State("user-session", "data"),
     prevent_initial_call=True
 )
-def handle_auth(n_login, n_register, n_logout, email, password, session_data):
+def handle_auth(n_login, n_register, n_logout, email, password):
     trigger = ctx.triggered_id
+    if not trigger:
+        raise PreventUpdate
+
     if not supabase_client:
         return no_update, "Brak poprawnej konfiguracji Supabase. Sprawdź terminal.", True, no_update
 
@@ -569,6 +571,11 @@ def handle_auth(n_login, n_register, n_logout, email, password, session_data):
     if not email or not password:
         return no_update, "Wpisz poprawny adres e-mail oraz hasło.", True, no_update
 
+    if trigger == "btn-register" and not n_register:
+        raise PreventUpdate
+    if trigger == "btn-login" and not n_login:
+        raise PreventUpdate
+
     try:
         if trigger == "btn-login":
             res = supabase_client.auth.sign_in_with_password({"email": email, "password": password})
@@ -578,13 +585,15 @@ def handle_auth(n_login, n_register, n_logout, email, password, session_data):
         user = res.user
         if user:
             return {"user_id": user.id, "email": user.email}, "", False, False
-        return no_update, "Wystąpił problem przy logowaniu", True, no_update
+        return no_update, "Wystąpił problem z weryfikacją konta.", True, no_update
     except Exception as e:
         err_msg = str(e)
         if "Invalid login credentials" in err_msg:
             err_msg = "Nieprawidłowe dane logowania."
-        elif "already registered" in err_msg:
+        elif "already registered" in err_msg or "User already registered" in err_msg:
             err_msg = "Taki adres email jest już zarejestrowany."
+        elif "Password should be at least" in err_msg:
+            err_msg = "Hasło jest za słabe (wymagane min. 6 znaków)."
         return no_update, err_msg, True, no_update
 
 @app.callback(
