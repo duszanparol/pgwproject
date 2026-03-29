@@ -19,3 +19,9 @@
 .dropdown-item:hover {
     background-color: #3a3b3c !important;
 }
+
+.leaflet-popup-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
