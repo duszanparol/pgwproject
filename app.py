@@ -2,6 +2,8 @@ import json
 import os
 import uuid
 from pathlib import Path
+from sqlalchemy import create_engine
+import geopandas as gpd
 
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
@@ -18,6 +20,7 @@ SANCTUARIES_URL = os.getenv(
     "SANCTUARIES_URL",
     "http://localhost:9000/collections/poland_pois.sanctuary/items.json?limit=5000",
 )
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 MODE_META = {
     "auto": {"label": "Samochód", "color": "#17a2b8"},
@@ -109,6 +112,41 @@ def normalize_sanctuaries(feature_collection):
 
 def load_sanctuaries():
     fallback_geojson = build_geojson(FALLBACK_SANCTUARIES)
+    if DATABASE_URL:
+        try:
+            db_url = DATABASE_URL
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
+            engine = create_engine(db_url)
+            # Użyj swojej dokładnej nazwy tabeli/schematu. Skoro wcześniej było "poland_pois.sanctuary", to:
+            gdf = gpd.read_postgis("SELECT * FROM poland_pois.sanctuary", engine, geom_col="geom")
+            
+            sanctuaries = []
+            seen_ids = set()
+            for index, row in gdf.iterrows():
+                sanctuary_id = str(row.get("id", f"sanctuary-{index}"))
+                if sanctuary_id in seen_ids:
+                    sanctuary_id = f"{sanctuary_id}-{index}"
+                seen_ids.add(sanctuary_id)
+                
+                sanctuaries.append({
+                    "id": sanctuary_id,
+                    "name": row.get("name") or row.get("title") or f"Sanktuarium {index}",
+                    "operator": row.get("operator", ""),
+                    "lat": float(row.geometry.y) if row.geometry else 0.0,
+                    "lon": float(row.geometry.x) if row.geometry else 0.0,
+                    "type": "sanctuary"
+                })
+                
+            return {
+                "items": sanctuaries,
+                "geojson": build_geojson(sanctuaries),
+            }
+        except Exception as e:
+            print(f"Błąd ładowania z bazy danych: {e}")
+            pass # fallback to rest api or default
+
     try:
         response = requests.get(SANCTUARIES_URL, timeout=HTTP_TIMEOUT)
         response.raise_for_status()
