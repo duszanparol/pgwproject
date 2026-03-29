@@ -13,7 +13,7 @@ from dash.exceptions import PreventUpdate
 
 APP_TITLE = "Projekt PGW"
 DEFAULT_CENTER = [52.06, 19.25]
-DEFAULT_ZOOM = 7
+DEFAULT_ZOOM = 6.75
 HTTP_TIMEOUT = float(os.getenv("CAMMINO_HTTP_TIMEOUT", "5"))
 VALHALLA_URL = os.getenv("VALHALLA_URL", "https://valhalla1.openstreetmap.de/route")
 SANCTUARIES_URL = os.getenv(
@@ -33,22 +33,78 @@ FALLBACK_SANCTUARIES = [
     {"id": "lichen", "name": "Licheń", "operator": "Marianie", "lat": 52.3216, "lon": 18.3582},
 ]
 
-DATA_FILE = Path(__file__).parent / "vacation_places.json"
 
+import sqlalchemy
+
+def get_engine():
+    if DATABASE_URL:
+        db_url = DATABASE_URL
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        return create_engine(db_url)
+    return None
+
+def init_db():
+    engine = get_engine()
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS user_places (
+                    id VARCHAR(255) PRIMARY KEY,
+                    name VARCHAR(255),
+                    lat FLOAT,
+                    lon FLOAT,
+                    image TEXT
+                )
+            """))
+
+init_db()
 
 def load_places():
-    if DATA_FILE.exists():
+    engine = get_engine()
+    if engine:
         try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return []
+            with engine.connect() as conn:
+                result = conn.execute(sqlalchemy.text("SELECT id, name, lat, lon, image FROM user_places"))
+                places = []
+                for row in result:
+                    place = {
+                        "id": row.id,
+                        "name": row.name,
+                        "lat": row.lat,
+                        "lon": row.lon
+                    }
+                    if row.image:
+                        place["image"] = row.image
+                    places.append(place)
+                return places
+        except Exception as e:
+            print(f"Error loading user places from DB: {e}")
+            
     return []
 
 
 def save_places(places):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(places, f, ensure_ascii=False, indent=2)
+    engine = get_engine()
+    if engine:
+        try:
+            with engine.begin() as conn:
+                # Clear existing and insert all (or just sync)
+                # For simplicity, we truncate and re-insert or use ON CONFLICT
+                conn.execute(sqlalchemy.text("DELETE FROM user_places"))
+                for place in places:
+                    conn.execute(sqlalchemy.text("""
+                        INSERT INTO user_places (id, name, lat, lon, image) 
+                        VALUES (:id, :name, :lat, :lon, :image)
+                    """), {
+                        "id": place["id"],
+                        "name": place.get("name"),
+                        "lat": place["lat"],
+                        "lon": place["lon"],
+                        "image": place.get("image")
+                    })
+        except Exception as e:
+            print(f"Error saving user places to DB: {e}")
 
 
 def make_coord_key(lat, lon):
