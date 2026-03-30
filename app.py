@@ -202,6 +202,11 @@ def load_sanctuaries():
                     "id": sanctuary_id,
                     "name": row.get("name") or row.get("title") or f"Sanktuarium {index}",
                     "operator": row.get("operator", ""),
+                    "opis": row.get("opis", ""),
+                    "strona_internetowa": row.get("strona_internetowa", ""),
+                    "data_powstania": row.get("data_powstania", ""),
+                    "religia": row.get("religia", ""),
+                    "wyznanie": row.get("wyznanie", ""),
                     "lat": float(geom.y) if geom else 0.0,
                     "lon": float(geom.x) if geom else 0.0,
                     "type": "sanctuary"
@@ -304,10 +309,12 @@ def create_user_markers(places):
             popup_content.append(html.Img(src=image_src, style={"width": "150px", "height": "auto", "borderRadius": "4px", "display": "block", "marginBottom": "8px"}))
         
         popup_content.append(html.Hr(className="my-2 border-secondary"))
-        popup_content.append(dbc.ButtonGroup([
-            dbc.Button("Ustaw jako start", id={"type": "set-start-btn", "index": place["id"]}, size="sm", color="secondary", className="text-light border-dark py-1"),
-            dbc.Button("Ustaw jako cel", id={"type": "set-end-btn", "index": place["id"]}, size="sm", color="secondary", className="text-light border-dark py-1")
-        ], className="w-100", vertical=True))
+        popup_content.append(html.Div([
+            dbc.Button("🟢 Ustaw jako Start", id={"type": "set-start-btn", "index": place["id"]}, 
+                       size="sm", color="success", outline=True, className="me-2", title="Rozpocznij trasę z tego miejsca"),
+            dbc.Button("🔵 Ustaw jako Cel", id={"type": "set-end-btn", "index": place["id"]}, 
+                       size="sm", color="info", outline=True, title="Zakończ trasę w tym miejscu")
+        ], className="d-flex justify-content-center mt-2"))
         
         markers.append(
             dl.Marker(
@@ -328,27 +335,53 @@ def create_sanctuary_markers(sanctuaries):
         lat, lon = s["lat"], s["lon"]
         name = s.get("name", "Sanktuarium")
         operator = s.get("operator", "")
+        opis = s.get("opis", "")
+        strona = s.get("strona_internetowa", "")
+        data_powstania = s.get("data_powstania", "")
+        religia = s.get("religia", "")
+        wyznanie = s.get("wyznanie", "")
         
-        popup_content = [
-            html.H6(name, className="mb-1 text-warning"),
-        ]
-        if operator:
-            popup_content.append(html.Div(f"Operator: {operator}", className="small text-muted mb-2"))
-        else:
-            popup_content.append(html.Div(f"{lat:.4f}, {lon:.4f}", className="small text-muted mb-2"))
+        info_rows = []
+        if operator and operator.lower() not in ["brak", "null"]:
+            info_rows.append(html.Div([html.B("Operator: "), html.Span(operator)], className="mb-1 text-muted small"))
+        if religia and religia.lower() not in ["brak", "null"]:
+            info_rows.append(html.Div([html.B("Religia: "), html.Span(religia)], className="mb-1 text-muted small"))
+        if wyznanie and wyznanie.lower() not in ["brak", "null"]:
+            info_rows.append(html.Div([html.B("Wyznanie: "), html.Span(wyznanie)], className="mb-1 text-muted small"))
+        if data_powstania and data_powstania.lower() not in ["brak", "null"]:
+            info_rows.append(html.Div([html.B("Data powstania: "), html.Span(data_powstania)], className="mb-1 text-muted small"))
+        
+        if strona and strona.lower() not in ["brak", "null"]:
+            info_rows.append(html.Div([
+                html.B("Strona: "), 
+                html.A("Przejdź do strony", href=strona, target="_blank", className="text-info text-decoration-none")
+            ], className="mb-2 small"))
             
-        popup_content.append(html.Hr(className="my-2 border-secondary"))
-        popup_content.append(dbc.ButtonGroup([
-            dbc.Button("Ustaw jako start", id={"type": "set-start-btn", "index": s["id"]}, size="sm", color="secondary", className="text-light border-dark py-1"),
-            dbc.Button("Ustaw jako cel", id={"type": "set-end-btn", "index": s["id"]}, size="sm", color="secondary", className="text-light border-dark py-1")
-        ], className="w-100", vertical=True))
+        if opis and opis.lower() not in ["brak", "null"]:
+            info_rows.append(html.Div(opis, className="sanctuary-desc small mt-2", style={"maxHeight": "150px", "overflowY": "auto", "paddingRight": "5px", "textAlign": "justify"}))
+            
+        popup_content = [
+            html.H5(name, className="mb-2 text-warning fw-bold border-bottom border-secondary pb-1"),
+            html.Div(info_rows, className="sanctuary-info"),
+            html.Hr(className="my-2 border-secondary"),
+            html.Div([
+                dbc.Button("🟢 Ustaw jako Start", id={"type": "set-start-btn", "index": s["id"]}, 
+                           size="sm", color="success", outline=True, className="me-2", title="Rozpocznij trasę z tego miejsca"),
+                dbc.Button("🔵 Ustaw jako Cel", id={"type": "set-end-btn", "index": s["id"]}, 
+                           size="sm", color="info", outline=True, title="Zakończ trasę w tym miejscu")
+            ], className="d-flex justify-content-center mt-2")
+        ]
         
         markers.append(
             dl.Marker(
                 position=[lat, lon],
                 children=[
-                    dl.Tooltip(name),
-                    dl.Popup(html.Div(popup_content, style={"backgroundColor": "#242526", "padding": "10px", "borderRadius": "5px"}), closeButton=False)
+                    dl.Tooltip(name, className="fw-bold"),
+                    dl.Popup(
+                        html.Div(popup_content, className="sanctuary-popup-container"),
+                        closeButton=True,
+                        className="custom-sanctuary-popup"
+                    )
                 ],
                 id={"type": "sanctuary-marker", "index": s["id"]}
             )

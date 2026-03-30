@@ -16,6 +16,55 @@
     margin: 8px !important;
 }
 
+/* Stylizacja dla okienek sanktuariów */
+.custom-sanctuary-popup .leaflet-popup-content-wrapper {
+    background: #1e1e1e !important;
+    color: #e4e6eb !important;
+    border: 1px solid #444;
+    border-radius: 10px !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6) !important;
+    padding: 0 !important;
+    max-width: 320px;
+}
+
+.custom-sanctuary-popup .leaflet-popup-tip {
+    background: #1e1e1e !important;
+}
+
+.custom-sanctuary-popup .leaflet-popup-content {
+    margin: 15px !important;
+    line-height: 1.4;
+}
+
+.custom-sanctuary-popup .leaflet-popup-close-button {
+    color: #e4e6eb !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    padding: 6px 10px !important;
+    text-decoration: none !important;
+}
+
+.custom-sanctuary-popup .leaflet-popup-close-button:hover {
+    color: #ff4757 !important;
+    background: transparent !important;
+}
+
+/* Pasek przewijania opisu */
+.sanctuary-desc::-webkit-scrollbar {
+    width: 6px;
+}
+.sanctuary-desc::-webkit-scrollbar-track {
+    background: #2d2d2d;
+    border-radius: 4px;
+}
+.sanctuary-desc::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 4px;
+}
+.sanctuary-desc::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
 .dropdown-item:hover {
     background-color: #3a3b3c !important;
 }
