@@ -331,33 +331,43 @@ def create_user_markers(places):
 
 def create_sanctuary_markers(sanctuaries):
     markers = []
+    
+    def safe_str(val):
+        """Zabezpiecza przed wartościami typu float (np. NaN z Pandas) i Null/None"""
+        if val is None:
+            return ""
+        s_val = str(val).strip()
+        if s_val.lower() in ["nan", "none", "null", "brak", ""]:
+            return ""
+        return s_val
+
     for s in sanctuaries:
         lat, lon = s["lat"], s["lon"]
-        name = s.get("name", "Sanktuarium")
-        operator = s.get("operator", "")
-        opis = s.get("opis", "")
-        strona = s.get("strona_internetowa", "")
-        data_powstania = s.get("data_powstania", "")
-        religia = s.get("religia", "")
-        wyznanie = s.get("wyznanie", "")
+        name = str(s.get("name", "Sanktuarium"))
+        operator = safe_str(s.get("operator"))
+        opis = safe_str(s.get("opis"))
+        strona = safe_str(s.get("strona_internetowa"))
+        data_powstania = safe_str(s.get("data_powstania"))
+        religia = safe_str(s.get("religia"))
+        wyznanie = safe_str(s.get("wyznanie"))
         
         info_rows = []
-        if operator and operator.lower() not in ["brak", "null"]:
+        if operator:
             info_rows.append(html.Div([html.B("Operator: "), html.Span(operator)], className="mb-1 text-muted small"))
-        if religia and religia.lower() not in ["brak", "null"]:
+        if religia:
             info_rows.append(html.Div([html.B("Religia: "), html.Span(religia)], className="mb-1 text-muted small"))
-        if wyznanie and wyznanie.lower() not in ["brak", "null"]:
+        if wyznanie:
             info_rows.append(html.Div([html.B("Wyznanie: "), html.Span(wyznanie)], className="mb-1 text-muted small"))
-        if data_powstania and data_powstania.lower() not in ["brak", "null"]:
+        if data_powstania:
             info_rows.append(html.Div([html.B("Data powstania: "), html.Span(data_powstania)], className="mb-1 text-muted small"))
         
-        if strona and strona.lower() not in ["brak", "null"]:
+        if strona:
             info_rows.append(html.Div([
                 html.B("Strona: "), 
                 html.A("Przejdź do strony", href=strona, target="_blank", className="text-info text-decoration-none")
             ], className="mb-2 small"))
             
-        if opis and opis.lower() not in ["brak", "null"]:
+        if opis:
             info_rows.append(html.Div(opis, className="sanctuary-desc small mt-2", style={"maxHeight": "150px", "overflowY": "auto", "paddingRight": "5px", "textAlign": "justify"}))
             
         popup_content = [
