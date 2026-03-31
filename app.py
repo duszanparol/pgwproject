@@ -278,6 +278,7 @@ def get_route(start_point, destination, mode):
         ],
         "costing": mode,
         "units": "kilometers",
+        "directions_options": {"language": "pl-PL"}
     }
     response = requests.post(VALHALLA_URL, json=payload, timeout=HTTP_TIMEOUT)
     if not response.ok:
@@ -980,9 +981,9 @@ def calculate_and_draw(start, end, mode, places):
                 dbc.Accordion([
                     dbc.AccordionItem(
                         html.Ul(maneuvers_list, className="list-unstyled m-0 px-1", style={"maxHeight": "250px", "overflowY": "auto"}),
-                        title="📜 Pokaż wskazówki dojazdu",
+                        title="Pokaż wskazówki dojazdu",
                     )
-                ], start_collapsed=True, flush=True, className="mt-2 text-dark") if maneuvers_list else None
+                ], start_collapsed=True, flush=True, className="mt-2 text-body") if maneuvers_list else None
                 
             ])
         except Exception as e:
