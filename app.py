@@ -442,7 +442,8 @@ app.layout = html.Div(
         dcc.Loading(
             id="main-loading",
             custom_spinner=html.Div(className="custom-top-loading-bar"),
-            overlay_style={"visibility":"visible", "opacity": 0.5, "backgroundColor": "transparent"},
+            overlay_style={"visibility": "hidden", "opacity": 1, "backgroundColor": "transparent"},
+            parent_className="loading-bar-wrapper",
             children=[
                 dbc.Container(
                     fluid=True,
