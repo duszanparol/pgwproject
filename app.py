@@ -439,10 +439,15 @@ app.layout = html.Div(
         dcc.Store(id="add-mode-store", data=False),
         dcc.Store(id="pending-coords", data=None),
         dcc.Store(id="theme-store", data="dark"),
-        dbc.Container(
-            fluid=True,
-            className="px-0",
+        dcc.Loading(
+            id="main-loading",
+            custom_spinner=html.Div(className="custom-top-loading-bar"),
+            overlay_style={"visibility":"visible", "opacity": 0.5, "backgroundColor": "transparent"},
             children=[
+                dbc.Container(
+                    fluid=True,
+                    className="px-0",
+                    children=[
                 dbc.Row(
                     className="g-0",
                     children=[
@@ -666,9 +671,10 @@ app.layout = html.Div(
                 )
             ],
         ),
-    ],
+        ]
+    )
+]
 )
-
 
 # 1. Toggle Add Mode
 @app.callback(
