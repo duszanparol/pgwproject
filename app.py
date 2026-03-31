@@ -572,7 +572,7 @@ app.layout = html.Div(
                                     children=[
                                         dl.TileLayer(
                                             id="base-tile-layer",
-                                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                                            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
                                             attribution="&copy; OpenStreetMap contributors &copy; CARTO",
                                         ),
                                         dl.LayerGroup(
@@ -707,8 +707,7 @@ def toggle_theme(n_clicks, current_theme):
 def sync_map_tiles_with_theme(theme):
     if theme == "light":
         return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    # motyw ciemny
-    return "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
 
 
 # 2. Map Click vs Context Menu

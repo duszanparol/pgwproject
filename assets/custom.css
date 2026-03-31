@@ -154,6 +154,10 @@ body {
     background-color: var(--map-bg);
 }
 
+.theme-dark .leaflet-tile-pane {
+    filter: brightness(0.8) saturate(0.95);
+}
+
 .context-menu-popup .leaflet-popup-content-wrapper {
     background: #242526 !important;
     color: white !important;
@@ -207,6 +211,11 @@ body {
 .custom-sanctuary-popup .leaflet-popup-content {
     margin: 15px !important;
     line-height: 1.4;
+}
+
+.sanctuary-info .text-muted {
+    color: var(--sidebar-text) !important;
+    opacity: 0.8;
 }
 
 .custom-sanctuary-popup .leaflet-popup-close-button {
