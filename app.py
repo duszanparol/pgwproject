@@ -966,7 +966,7 @@ def calculate_and_draw(start, end, mode, places):
                 for m in route["maneuvers"]:
                     dist = m.get("length", 0)
                     dist_str = f"({dist:.1f} km)" if dist >= 0.1 else f"({int(dist*1000)} m)"
-                    maneuvers_list.append(html.Li(f"{m.get('instruction', '')} {dist_str}", className="small py-1 border-bottom border-dark text-muted"))
+                    maneuvers_list.append(html.Li(f"{m.get('instruction', '')} {dist_str}", className="small py-1 border-bottom maneuver-item text-muted"))
             
             info = html.Div([
                 html.H6("Szczegóły trasy:", className="mb-2 text-info"),
