@@ -439,14 +439,6 @@ app.layout = html.Div(
         dcc.Store(id="add-mode-store", data=False),
         dcc.Store(id="pending-coords", data=None),
         dcc.Store(id="theme-store", data="dark"),
-        dcc.Loading(
-            id="main-loading",
-            custom_spinner=html.Div(className="custom-top-loading-bar"),
-            target_components={
-                "route-layer": "children",
-                "route-info": "children",
-            }
-        ),
         dbc.Container(
                     fluid=True,
                     className="px-0",
@@ -567,6 +559,18 @@ app.layout = html.Div(
                                 html.Div(
                                     id="route-info",
                                     className="mt-2 text-light small route-info-panel",
+                                ),
+                                html.Div(
+                                    dcc.Loading(
+                                        id="main-loading",
+                                        type="circle",
+                                        color="#17a2b8",
+                                        target_components={
+                                            "route-layer": "children",
+                                            "route-info": "children",
+                                        }
+                                    ),
+                                    className="mt-auto d-flex justify-content-center p-3"
                                 ),
                             ],
                         ),
