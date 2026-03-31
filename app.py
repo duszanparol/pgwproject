@@ -414,6 +414,7 @@ sanctuary_catalog = load_sanctuaries()
 SANCTUARIES = sanctuary_catalog["items"]
 SANCTUARY_GEOJSON = sanctuary_catalog["geojson"]
 INITIAL_PLACES = load_places()
+GLOBAL_SANCTUARY_MARKERS = create_sanctuary_markers(SANCTUARIES)
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], suppress_callback_exceptions=True)
 
@@ -565,10 +566,7 @@ app.layout = html.Div(
                                         id="main-loading",
                                         type="circle",
                                         color="#17a2b8",
-                                        target_components={
-                                            "route-layer": "children",
-                                            "route-info": "children",
-                                        }
+                                        children=html.Div(id="loading-output", style={"display": "none"})
                                     ),
                                     className="mt-auto d-flex justify-content-center p-3"
                                 ),
@@ -596,9 +594,7 @@ app.layout = html.Div(
                                         ),
                                         dl.LayerGroup(
                                             id="sanctuary-markers-layer",
-                                            children=create_sanctuary_markers(
-                                                SANCTUARIES
-                                            ),
+                                            children=GLOBAL_SANCTUARY_MARKERS,
                                         ),
                                         dl.LayerGroup(
                                             id="user-markers-layer",
@@ -914,6 +910,7 @@ def update_route_endpoints(context_start, context_end, start_btn, end_btn, start
     Output("route-info", "children"),
     Output("sanctuary-markers-layer", "children"),
     Output("user-markers-layer", "children"),
+    Output("loading-output", "children"),
     Input("start-store", "data"),
     Input("end-store", "data"),
     Input("mode-select", "value"),
@@ -924,13 +921,14 @@ def calculate_and_draw(start, end, mode, places):
     end_layer = None
     route_layer = None
     info = None
-    sanctuary_markers = None
-    user_markers = None
+    sanctuary_markers = no_update
+    user_markers = create_user_markers(places or [])
+    loading_dummy = ""
 
     if start:
-        start_layer = [dl.CircleMarker(center=[start["lat"], start["lon"]], radius=8, color="#28a745", fillOpacity=1)]
+        start_layer = [dl.CircleMarker(center=[start["lat"], start["lon"]], radius=20, color="#28a745", weight=4, fillOpacity=0.6)]
     if end:
-        end_layer = [dl.CircleMarker(center=[end["lat"], end["lon"]], radius=8, color="#007bff", fillOpacity=1)]
+        end_layer = [dl.CircleMarker(center=[end["lat"], end["lon"]], radius=20, color="#007bff", weight=4, fillOpacity=0.6)]
         
     if start and end:
         try:
@@ -953,12 +951,7 @@ def calculate_and_draw(start, end, mode, places):
         except Exception as e:
             info = dbc.Alert(f"Błąd wyznaczania trasy: {e}", color="danger", className="mt-2 p-2 small")
 
-    else:
-        # Pokaż znaczniki z powrotem, gdy jeden z punktów (albo oba) jest pusty
-        sanctuary_markers = create_sanctuary_markers(SANCTUARIES)
-        user_markers = create_user_markers(places or [])
-
-    return start_layer, end_layer, route_layer, info, sanctuary_markers, user_markers
+    return start_layer, end_layer, route_layer, info, sanctuary_markers, user_markers, loading_dummy
 
 
 @app.callback(
