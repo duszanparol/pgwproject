@@ -429,6 +429,7 @@ sidebar_style = {
     "height": "100vh",
     "display": "flex",
     "flexDirection": "column",
+    "overflow": "hidden",
 }
 
 input_style = {
@@ -567,6 +568,7 @@ app.layout = html.Div(
                                 html.Div(
                                     id="route-info",
                                     className="mt-2 text-light small route-info-panel",
+                                    style={"flex": "1", "overflowY": "auto", "paddingRight": "5px"},
                                 ),
                                 html.Div(
                                     dcc.Loading(
@@ -978,12 +980,10 @@ def calculate_and_draw(start, end, mode, places):
                 ], className="mb-2"),
                 html.Div(badges, className="mb-3") if badges else None,
                 
-                dbc.Accordion([
-                    dbc.AccordionItem(
-                        html.Ul(maneuvers_list, className="list-unstyled m-0 px-1", style={"maxHeight": "250px", "overflowY": "auto"}),
-                        title="Pokaż wskazówki dojazdu",
-                    )
-                ], start_collapsed=True, flush=True, className="mt-2 text-body") if maneuvers_list else None
+                html.Details([
+                    html.Summary("Pokaż wskazówki dojazdu", className="text-primary mb-2 mt-3", style={"cursor": "pointer", "fontWeight": "bold"}),
+                    html.Ul(maneuvers_list, className="list-unstyled m-0 px-1")
+                ]) if maneuvers_list else None
                 
             ])
         except Exception as e:
