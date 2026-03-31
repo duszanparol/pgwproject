@@ -287,10 +287,16 @@ def get_route(start_point, destination, mode):
     if not trip:
         raise ValueError("Valhalla did not return a trip")
     leg = (trip.get("legs") or [{}])[0]
+    summary = trip.get("summary") or {}
+    
     return {
         "path": decode_polyline(leg.get("shape", ""), precision=6),
-        "distance_km": float((trip.get("summary") or {}).get("length", 0)),
-        "time_seconds": float((trip.get("summary") or {}).get("time", 0)),
+        "distance_km": float(summary.get("length", 0)),
+        "time_seconds": float(summary.get("time", 0)),
+        "has_toll": summary.get("has_toll", False),
+        "has_highway": summary.get("has_highway", False),
+        "has_ferry": summary.get("has_ferry", False),
+        "maneuvers": leg.get("maneuvers", [])
     }
 
 
@@ -945,11 +951,40 @@ def calculate_and_draw(start, end, mode, places):
             hours = mins // 60
             mins_rem = mins % 60
             time_str = f"{hours}h {mins_rem}min" if hours else f"{mins_rem} min"
-            info = [
-                html.Strong("Szczegóły trasy:"), html.Br(),
-                f"Dystans: {route['distance_km']:.1f} km", html.Br(),
-                f"Czas: {time_str}"
-            ]
+            
+            badges = []
+            if route.get("has_toll"):
+                badges.append(dbc.Badge("Bramki/Płatne", color="warning", className="me-1 mb-1 text-dark"))
+            if route.get("has_highway"):
+                badges.append(dbc.Badge("Autostrada", color="primary", className="me-1 mb-1"))
+            if route.get("has_ferry"):
+                badges.append(dbc.Badge("Prom", color="info", className="me-1 mb-1"))
+            
+            maneuvers_list = []
+            if route.get("maneuvers"):
+                for m in route["maneuvers"]:
+                    dist = m.get("length", 0)
+                    dist_str = f"({dist:.1f} km)" if dist >= 0.1 else f"({int(dist*1000)} m)"
+                    maneuvers_list.append(html.Li(f"{m.get('instruction', '')} {dist_str}", className="small py-1 border-bottom border-dark text-muted"))
+            
+            info = html.Div([
+                html.H6("Szczegóły trasy:", className="mb-2 text-info"),
+                html.Div([
+                    html.Strong("Dystans: "), f"{route['distance_km']:.1f} km"
+                ], className="mb-1"),
+                html.Div([
+                    html.Strong("Czas: "), time_str
+                ], className="mb-2"),
+                html.Div(badges, className="mb-3") if badges else None,
+                
+                dbc.Accordion([
+                    dbc.AccordionItem(
+                        html.Ul(maneuvers_list, className="list-unstyled m-0 px-1", style={"maxHeight": "250px", "overflowY": "auto"}),
+                        title="📜 Pokaż wskazówki dojazdu",
+                    )
+                ], start_collapsed=True, flush=True, className="mt-2 text-dark") if maneuvers_list else None
+                
+            ])
         except Exception as e:
             info = dbc.Alert(f"Błąd wyznaczania trasy: {e}", color="danger", className="mt-2 p-2 small")
 
