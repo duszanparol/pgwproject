@@ -921,16 +921,18 @@ def calculate_and_draw(start, end, mode, places):
     end_layer = None
     route_layer = None
     info = None
-    sanctuary_markers = no_update
+    sanctuary_markers = GLOBAL_SANCTUARY_MARKERS
     user_markers = create_user_markers(places or [])
     loading_dummy = ""
 
     if start:
-        start_layer = [dl.CircleMarker(center=[start["lat"], start["lon"]], radius=20, color="#28a745", weight=4, fillOpacity=0.6)]
+        start_layer = [dl.CircleMarker(center=[start["lat"], start["lon"]], radius=8, color="#28a745", weight=2, fillOpacity=1)]
     if end:
-        end_layer = [dl.CircleMarker(center=[end["lat"], end["lon"]], radius=20, color="#007bff", weight=4, fillOpacity=0.6)]
+        end_layer = [dl.CircleMarker(center=[end["lat"], end["lon"]], radius=8, color="#007bff", weight=2, fillOpacity=1)]
         
     if start and end:
+        sanctuary_markers = []
+        user_markers = []
         try:
             route = get_route(start, end, mode)
             route_layer = [dl.Polyline(
