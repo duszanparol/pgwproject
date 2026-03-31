@@ -321,9 +321,19 @@ def create_user_markers(places):
                 position=[lat, lon],
                 children=[
                     dl.Tooltip(name),
-                    dl.Popup(html.Div(popup_content, style={"backgroundColor": "#242526", "padding": "10px", "borderRadius": "5px"}), closeButton=False)
+                    dl.Popup(
+                        html.Div(
+                            popup_content,
+                            style={
+                                "backgroundColor": "#242526",
+                                "padding": "10px",
+                                "borderRadius": "5px",
+                            },
+                        ),
+                        closeButton=False,
+                    ),
                 ],
-                id={"type": "user-marker", "index": place["id"]}
+                id={"type": "user-marker", "index": place["id"]},
             )
         )
     return markers
@@ -388,12 +398,14 @@ def create_sanctuary_markers(sanctuaries):
                 children=[
                     dl.Tooltip(name, className="fw-bold"),
                     dl.Popup(
-                        html.Div(popup_content, className="sanctuary-popup-container"),
+                        html.Div(
+                            popup_content, className="sanctuary-popup-container"
+                        ),
                         closeButton=True,
-                        className="custom-sanctuary-popup"
-                    )
+                        className="custom-sanctuary-popup",
+                    ),
                 ],
-                id={"type": "sanctuary-marker", "index": s["id"]}
+                id={"type": "sanctuary-marker", "index": s["id"]},
             )
         )
     return markers
@@ -405,126 +417,249 @@ INITIAL_PLACES = load_places()
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], suppress_callback_exceptions=True)
 
-dark_sidebar_style = {
-    "backgroundColor": "#18191a",
-    "color": "#e4e6eb",
+sidebar_style = {
     "height": "100vh",
-    "borderRight": "1px solid #3a3b3c",
     "display": "flex",
-    "flexDirection": "column"
+    "flexDirection": "column",
 }
 
-dark_input_style = {
-    "backgroundColor": "#3a3b3c",
-    "color": "#e4e6eb",
+input_style = {
+    "backgroundColor": "transparent",
+    "color": "inherit",
     "border": "none",
-    "borderRadius": "8px"
 }
 
-app.layout = dbc.Container(
-    fluid=True,
-    className="px-0",
+app.layout = html.Div(
+    id="app-root",
+    className="theme-dark",
     children=[
         dcc.Store(id="start-store", data=None),
         dcc.Store(id="end-store", data=None),
         dcc.Store(id="places-store", data=INITIAL_PLACES),
         dcc.Store(id="add-mode-store", data=False),
         dcc.Store(id="pending-coords", data=None),
-        
-        dbc.Row(className="g-0", children=[
-            # Sidebar
-            dbc.Col(
-                width=3,
-                style=dark_sidebar_style,
-                className="p-3",
-                children=[
-                    html.Div([
-                        html.H4("Projekt PGW", className="mb-0 fw-bold", style={"letterSpacing": "-1px"}),
-                        html.Small("📍 Moja Mapa", className="text-muted")
-                    ], className="mb-4 d-flex justify-content-between align-items-center"),
-                    
-                    # Routing Inputs
-                    dbc.InputGroup([
-                        dbc.InputGroupText("🟢", style={"backgroundColor": "transparent", "border": "none"}),
-                        dbc.Input(id="start-display", placeholder="Skąd jedziemy?", readonly=True, style=dark_input_style)
-                    ], className="mb-2"),
-                    
-                    dbc.InputGroup([
-                        dbc.InputGroupText("🔵", style={"backgroundColor": "transparent", "border": "none"}),
-                        dbc.Input(id="end-display", placeholder="Dokąd jedziemy?", readonly=True, style=dark_input_style)
-                    ], className="mb-3"),
-                    
-                    html.Div([
-                        dbc.Select(
-                            id="mode-select",
-                            options=[{"label": m["label"], "value": k} for k, m in MODE_META.items()],
-                            value="auto",
-                            style=dark_input_style
-                        )
-                    ], className="mb-4"),
-                    
-                    dbc.Button(
-                        "➕ Dodaj własne miejsce", 
-                        id="toggle-add-mode-btn", 
-                        color="secondary", 
-                        outline=True, 
-                        className="w-100 mb-2 border-0 shadow-none text-start",
-                        style={"backgroundColor": "#242526"}
-                    ),
-                    html.Div(id="add-mode-status", className="text-warning small mb-3"),
-                    
-                    html.Hr(style={"borderColor": "#3a3b3c"}),
-                    
-                    html.Div(id="route-info", className="mt-2 text-light small"),
-                ]
-            ),
-            
-            # Map Area
-            dbc.Col(
-                width=9,
-                children=[
-                    dl.Map(
-                        id="map",
-                        center=DEFAULT_CENTER,
-                        zoom=DEFAULT_ZOOM,
-                        zoomControl=False,
-                        style={"width": "100%", "height": "100vh", "backgroundColor": "#000"},
-                        children=[
-                            dl.TileLayer(),
-                            dl.LayerGroup(id="sanctuary-markers-layer", children=create_sanctuary_markers(SANCTUARIES)),
-                            dl.LayerGroup(id="user-markers-layer", children=create_user_markers(INITIAL_PLACES)),
-                            dl.LayerGroup(id="route-layer"),
-                            dl.LayerGroup(id="start-icon-layer"),
-                            dl.LayerGroup(id="end-icon-layer"),
-                            dl.LayerGroup(id="context-menu-layer")
-                        ]
-                    ),
-                    
-                    # Add Place Modal
-                    dbc.Modal([
-                        dbc.ModalHeader(dbc.ModalTitle("Dodaj nowe miejsce"), close_button=True),
-                        dbc.ModalBody([
-                            html.Div(id="modal-coords-display", className="small text-muted mb-3"),
-                            dbc.Label("Nazwa miejsca:"),
-                            dbc.Input(id="new-place-name", placeholder="np. Dom, Praca...", className="mb-3"),
-                            dbc.Label("Zdjęcie (opcjonalnie):"),
-                            dcc.Upload(
-                                id="new-place-image",
-                                children=html.Div([html.A("Wybierz plik zdjęciowy")]),
-                                style={"width": "100%", "height": "60px", "lineHeight": "60px",
-                                       "borderWidth": "1px", "borderStyle": "dashed",
-                                       "borderRadius": "5px", "textAlign": "center", "marginBottom": "10px"}
-                            ),
-                            html.Div(id="new-place-preview", className="mb-3")
-                        ]),
-                        dbc.ModalFooter([
-                            dbc.Button("Zapisz", id="save-place-btn", color="primary")
-                        ])
-                    ], id="add-place-modal", is_open=False, backdrop="static"),
-                ]
-            )
-        ])
-    ]
+        dcc.Store(id="theme-store", data="dark"),
+        dbc.Container(
+            fluid=True,
+            className="px-0",
+            children=[
+                dbc.Row(
+                    className="g-0",
+                    children=[
+                        # Sidebar
+                        dbc.Col(
+                            width=3,
+                            style=sidebar_style,
+                            className="p-3 sidebar-panel",
+                            children=[
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            [
+                                                html.H4(
+                                                    "Projekt PGW",
+                                                    className="mb-0 fw-bold",
+                                                ),
+                                                html.Small(
+                                                    "📍 Wyznaczanie tras do sanktuarium",
+                                                    className="sidebar-subtitle",
+                                                ),
+                                            ],
+                                            className="d-flex flex-column",
+                                        ),
+                                        dbc.Button(
+                                            "🌙",
+                                            id="theme-toggle-btn",
+                                            color="link",
+                                            className="theme-toggle-btn ms-2 p-0",
+                                        ),
+                                    ],
+                                    className="mb-4 d-flex justify-content-between align-items-center",
+                                ),
+                                html.Div(
+                                    [
+                                        # Routing Inputs
+                                        dbc.InputGroup(
+                                            [
+                                                dbc.InputGroupText(
+                                                    "🟢",
+                                                    style={
+                                                        "backgroundColor": "transparent",
+                                                        "border": "none",
+                                                    },
+                                                ),
+                                                dbc.Input(
+                                                    id="start-display",
+                                                    placeholder="Skąd jedziemy?",
+                                                    readonly=True,
+                                                    style=input_style,
+                                                ),
+                                            ],
+                                            className="mb-2 sidebar-input-group",
+                                        ),
+                                        dbc.InputGroup(
+                                            [
+                                                dbc.InputGroupText(
+                                                    "🔵",
+                                                    style={
+                                                        "backgroundColor": "transparent",
+                                                        "border": "none",
+                                                    },
+                                                ),
+                                                dbc.Input(
+                                                    id="end-display",
+                                                    placeholder="Dokąd jedziemy?",
+                                                    readonly=True,
+                                                    style=input_style,
+                                                ),
+                                            ],
+                                            className="mb-3 sidebar-input-group",
+                                        ),
+                                        html.Div(
+                                            [
+                                                html.Div(
+                                                    dbc.Select(
+                                                        id="mode-select",
+                                                        options=[
+                                                            {
+                                                                "label": m["label"],
+                                                                "value": k,
+                                                            }
+                                                            for k, m in MODE_META.items()
+                                                        ],
+                                                        value="auto",
+                                                    ),
+                                                    className="mode-select-wrapper",
+                                                )
+                                            ],
+                                            className="mb-4",
+                                        ),
+                                    ],
+                                    className="sidebar-section-card p-3 mb-3",
+                                ),
+                                dbc.Button(
+                                    "➕ Dodaj własne miejsce",
+                                    id="toggle-add-mode-btn",
+                                    color="secondary",
+                                    outline=True,
+                                    className="w-100 mb-2 border-0 shadow-none text-start add-place-btn",
+                                ),
+                                html.Div(
+                                    id="add-mode-status",
+                                    className="text-warning small mb-3",
+                                ),
+                                html.Hr(),
+                                html.Div(
+                                    id="route-info",
+                                    className="mt-2 text-light small route-info-panel",
+                                ),
+                            ],
+                        ),
+                        # Map Area
+                        dbc.Col(
+                            width=9,
+                            className="map-root",
+                            children=[
+                                dl.Map(
+                                    id="map",
+                                    center=DEFAULT_CENTER,
+                                    zoom=DEFAULT_ZOOM,
+                                    zoomControl=False,
+                                    style={
+                                        "width": "100%",
+                                        "height": "100vh",
+                                    },
+                                    children=[
+                                        dl.TileLayer(
+                                            id="base-tile-layer",
+                                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                                            attribution="&copy; OpenStreetMap contributors &copy; CARTO",
+                                        ),
+                                        dl.LayerGroup(
+                                            id="sanctuary-markers-layer",
+                                            children=create_sanctuary_markers(
+                                                SANCTUARIES
+                                            ),
+                                        ),
+                                        dl.LayerGroup(
+                                            id="user-markers-layer",
+                                            children=create_user_markers(
+                                                INITIAL_PLACES
+                                            ),
+                                        ),
+                                        dl.LayerGroup(id="route-layer"),
+                                        dl.LayerGroup(id="start-icon-layer"),
+                                        dl.LayerGroup(id="end-icon-layer"),
+                                        dl.LayerGroup(id="context-menu-layer"),
+                                    ],
+                                ),
+                                # Add Place Modal
+                                dbc.Modal(
+                                    [
+                                        dbc.ModalHeader(
+                                            dbc.ModalTitle("Dodaj nowe miejsce"),
+                                            close_button=True,
+                                        ),
+                                        dbc.ModalBody(
+                                            [
+                                                html.Div(
+                                                    id="modal-coords-display",
+                                                    className="small text-muted mb-3",
+                                                ),
+                                                dbc.Label("Nazwa miejsca:"),
+                                                dbc.Input(
+                                                    id="new-place-name",
+                                                    placeholder="np. Dom, Praca...",
+                                                    className="mb-3",
+                                                ),
+                                                dbc.Label("Zdjęcie (opcjonalnie):"),
+                                                dcc.Upload(
+                                                    id="new-place-image",
+                                                    children=html.Div(
+                                                        [
+                                                            html.A(
+                                                                "Wybierz plik zdjęciowy"
+                                                            )
+                                                        ]
+                                                    ),
+                                                    style={
+                                                        "width": "100%",
+                                                        "height": "60px",
+                                                        "lineHeight": "60px",
+                                                        "borderWidth": "1px",
+                                                        "borderStyle": "dashed",
+                                                        "borderRadius": "5px",
+                                                        "textAlign": "center",
+                                                        "marginBottom": "10px",
+                                                    },
+                                                ),
+                                                html.Div(
+                                                    id="new-place-preview",
+                                                    className="mb-3",
+                                                ),
+                                            ]
+                                        ),
+                                        dbc.ModalFooter(
+                                            [
+                                                dbc.Button(
+                                                    "Zapisz",
+                                                    id="save-place-btn",
+                                                    color="primary",
+                                                )
+                                            ]
+                                        ),
+                                    ],
+                                    id="add-place-modal",
+                                    is_open=False,
+                                    backdrop="static",
+                                ),
+                            ],
+                        ),
+                    ],
+                )
+            ],
+        ),
+    ],
 )
 
 
@@ -542,8 +677,38 @@ def toggle_add_mode(n_clicks, is_active):
     new_state = not is_active
     status = "📌 Kliknij mapę, aby dodać miejsce..." if new_state else ""
     color = "primary" if new_state else "secondary"
-    style = {"backgroundColor": "#2b5278"} if new_state else {"backgroundColor": "#242526"}
+    style = (
+        {"backgroundColor": "#2b5278"}
+        if new_state
+        else {"backgroundColor": "transparent"}
+    )
     return new_state, status, color, style
+
+
+@app.callback(
+    Output("theme-store", "data"),
+    Output("app-root", "className"),
+    Output("theme-toggle-btn", "children"),
+    Input("theme-toggle-btn", "n_clicks"),
+    State("theme-store", "data"),
+    prevent_initial_call=True,
+)
+def toggle_theme(n_clicks, current_theme):
+    new_theme = "light" if current_theme == "dark" else "dark"
+    root_class = f"theme-{new_theme}"
+    icon = "☀️" if new_theme == "light" else "🌙"
+    return new_theme, root_class, icon
+
+
+@app.callback(
+    Output("base-tile-layer", "url"),
+    Input("theme-store", "data"),
+)
+def sync_map_tiles_with_theme(theme):
+    if theme == "light":
+        return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    # motyw ciemny
+    return "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
 
 
 # 2. Map Click vs Context Menu
