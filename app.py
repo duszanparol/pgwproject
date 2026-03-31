@@ -330,7 +330,7 @@ def create_user_markers(places):
                                 "borderRadius": "5px",
                             },
                         ),
-                        closeButton=False,
+                        closeButton=True,
                     ),
                 ],
                 id={"type": "user-marker", "index": place["id"]},
@@ -529,10 +529,17 @@ app.layout = html.Div(
                                                         ],
                                                         value="auto",
                                                     ),
-                                                    className="mode-select-wrapper",
-                                                )
+                                                    className="mode-select-wrapper w-100 me-2",
+                                                ),
+                                                dbc.Button(
+                                                    "Reset",
+                                                    id="reset-route-btn",
+                                                    color="danger",
+                                                    outline=True,
+                                                    title="Resetuj trasę",
+                                                ),
                                             ],
-                                            className="mb-4",
+                                            className="mb-4 d-flex align-items-center",
                                         ),
                                     ],
                                     className="sidebar-section-card p-3 mb-3",
@@ -932,6 +939,20 @@ def calculate_and_draw(start, end, mode):
             info = dbc.Alert(f"Błąd wyznaczania trasy: {e}", color="danger", className="mt-2 p-2 small")
 
     return start_layer, end_layer, route_layer, info
+
+
+@app.callback(
+    Output("start-store", "data", allow_duplicate=True),
+    Output("end-store", "data", allow_duplicate=True),
+    Output("start-display", "value", allow_duplicate=True),
+    Output("end-display", "value", allow_duplicate=True),
+    Input("reset-route-btn", "n_clicks"),
+    prevent_initial_call=True
+)
+def reset_route(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return None, None, "", ""
 
 
 if __name__ == "__main__":
