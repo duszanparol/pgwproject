@@ -442,10 +442,12 @@ app.layout = html.Div(
         dcc.Loading(
             id="main-loading",
             custom_spinner=html.Div(className="custom-top-loading-bar"),
-            overlay_style={"visibility": "hidden", "opacity": 1, "backgroundColor": "transparent"},
-            parent_className="loading-bar-wrapper",
-            children=[
-                dbc.Container(
+            target_components={
+                "route-layer": "children",
+                "route-info": "children",
+            }
+        ),
+        dbc.Container(
                     fluid=True,
                     className="px-0",
                     children=[
@@ -672,9 +674,7 @@ app.layout = html.Div(
                 )
             ],
         ),
-        ]
-    )
-]
+    ]
 )
 
 # 1. Toggle Add Mode
