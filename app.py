@@ -770,7 +770,7 @@ def handle_map_click(map_click, map_click_lat_lng, is_add_mode):
     
     if is_add_mode:
         # Open Add Modal
-        return [], True, coords, f"Współrzędne: {lat:.5f}, {lon:.5f}"
+        return None, True, coords, f"Współrzędne: {lat:.5f}, {lon:.5f}"
     else:
         # Open Context Menu Popup
         popup = dl.Popup(
@@ -799,7 +799,6 @@ def handle_map_click(map_click, map_click_lat_lng, is_add_mode):
 # 3. Handle Add Place Form
 @app.callback(
     Output("places-store", "data"),
-    Output("user-markers-layer", "children"),
     Output("add-place-modal", "is_open", allow_duplicate=True),
     Output("new-place-name", "value"),
     Output("new-place-image", "contents"),
@@ -827,7 +826,7 @@ def save_new_place(n_clicks, coords, name, image, places):
     places.append(new_place)
     save_places(places)
     
-    return places, create_user_markers(places), False, "", None, ""
+    return places, False, "", None, ""
 
 
 @app.callback(
@@ -891,9 +890,9 @@ def update_route_endpoints(context_start, context_end, start_btn, end_btn, start
         display_name = place.get("name", "Wybrane miejsce")
         
     if is_start:
-        return point, end_store, display_name, end_disp, []
+        return point, end_store, display_name, end_disp, None
     else:
-        return start_store, point, start_disp, display_name, []
+        return start_store, point, start_disp, display_name, None
 
 
 # 5. Draw icons and route
@@ -902,15 +901,20 @@ def update_route_endpoints(context_start, context_end, start_btn, end_btn, start
     Output("end-icon-layer", "children"),
     Output("route-layer", "children"),
     Output("route-info", "children"),
+    Output("sanctuary-markers-layer", "children"),
+    Output("user-markers-layer", "children"),
     Input("start-store", "data"),
     Input("end-store", "data"),
-    Input("mode-select", "value")
+    Input("mode-select", "value"),
+    Input("places-store", "data")
 )
-def calculate_and_draw(start, end, mode):
-    start_layer = []
-    end_layer = []
-    route_layer = []
-    info = []
+def calculate_and_draw(start, end, mode, places):
+    start_layer = None
+    end_layer = None
+    route_layer = None
+    info = None
+    sanctuary_markers = None
+    user_markers = None
 
     if start:
         start_layer = [dl.CircleMarker(center=[start["lat"], start["lon"]], radius=8, color="#28a745", fillOpacity=1)]
@@ -938,7 +942,12 @@ def calculate_and_draw(start, end, mode):
         except Exception as e:
             info = dbc.Alert(f"Błąd wyznaczania trasy: {e}", color="danger", className="mt-2 p-2 small")
 
-    return start_layer, end_layer, route_layer, info
+    else:
+        # Pokaż znaczniki z powrotem, gdy jeden z punktów (albo oba) jest pusty
+        sanctuary_markers = create_sanctuary_markers(SANCTUARIES)
+        user_markers = create_user_markers(places or [])
+
+    return start_layer, end_layer, route_layer, info, sanctuary_markers, user_markers
 
 
 @app.callback(
