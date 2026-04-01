@@ -423,7 +423,7 @@ SANCTUARY_GEOJSON = sanctuary_catalog["geojson"]
 INITIAL_PLACES = load_places()
 GLOBAL_SANCTUARY_MARKERS = create_sanctuary_markers(SANCTUARIES)
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], suppress_callback_exceptions=True)
+app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 
 sidebar_style = {
     "height": "100vh",
@@ -440,14 +440,14 @@ input_style = {
 
 app.layout = html.Div(
     id="app-root",
-    className="theme-dark",
+    className="theme-light",
     children=[
         dcc.Store(id="start-store", data=None),
         dcc.Store(id="end-store", data=None),
         dcc.Store(id="places-store", data=INITIAL_PLACES),
         dcc.Store(id="add-mode-store", data=False),
         dcc.Store(id="pending-coords", data=None),
-        dcc.Store(id="theme-store", data="dark"),
+        dcc.Store(id="theme-store", data="light"),
         dbc.Container(
                     fluid=True,
                     className="px-0",
@@ -719,7 +719,7 @@ def toggle_add_mode(n_clicks, is_active):
 def toggle_theme(n_clicks, current_theme):
     new_theme = "light" if current_theme == "dark" else "dark"
     root_class = f"theme-{new_theme}"
-    icon = "☀️" if new_theme == "light" else "🌙"
+    icon = "🌙" if new_theme == "light" else "☀️"
     return new_theme, root_class, icon
 
 
