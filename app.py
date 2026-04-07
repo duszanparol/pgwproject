@@ -28,6 +28,21 @@ MODE_META = {
     "pedestrian": {"label": "Pieszo", "color": "#6c757d"},
 }
 
+MAX_VISIBLE_SANCTUARIES = 700
+MAX_VISIBLE_USER_PLACES = 300
+
+SANCTUARY_ICON = {
+    "iconUrl": "/assets/christian-cross-svgrepo-com.svg",
+    "iconSize": [26, 26],
+    "iconAnchor": [13, 26],
+}
+
+USER_PLACE_ICON = {
+    "iconUrl": "/assets/location-map-navigation-svgrepo-com.svg",
+    "iconSize": [26, 26],
+    "iconAnchor": [13, 26],
+}
+
 FALLBACK_SANCTUARIES = [
     {"id": "jasna-gora", "name": "Jasna Góra", "operator": "Paulini", "lat": 50.8122, "lon": 19.0972},
     {"id": "lichen", "name": "Licheń", "operator": "Marianie", "lat": 52.3216, "lon": 18.3582},
@@ -326,6 +341,7 @@ def create_user_markers(places):
         markers.append(
             dl.Marker(
                 position=[lat, lon],
+                icon=USER_PLACE_ICON,
                 children=[
                     dl.Tooltip(name),
                     dl.Popup(
@@ -402,6 +418,7 @@ def create_sanctuary_markers(sanctuaries):
         markers.append(
             dl.Marker(
                 position=[lat, lon],
+                icon=SANCTUARY_ICON,
                 children=[
                     dl.Tooltip(name, className="fw-bold"),
                     dl.Popup(
@@ -416,6 +433,25 @@ def create_sanctuary_markers(sanctuaries):
             )
         )
     return markers
+
+
+def filter_points_in_bounds(points, bounds, limit=None):
+    if not bounds or len(bounds) != 2:
+        return points[:limit] if limit else points
+    south_west, north_east = bounds
+    if not south_west or not north_east or len(south_west) < 2 or len(north_east) < 2:
+        return points[:limit] if limit else points
+    south, west = float(south_west[0]), float(south_west[1])
+    north, east = float(north_east[0]), float(north_east[1])
+    in_view = []
+    for point in points:
+        lat = float(point.get("lat", 0))
+        lon = float(point.get("lon", 0))
+        if south <= lat <= north and west <= lon <= east:
+            in_view.append(point)
+            if limit and len(in_view) >= limit:
+                break
+    return in_view
 
 sanctuary_catalog = load_sanctuaries()
 SANCTUARIES = sanctuary_catalog["items"]
@@ -598,7 +634,7 @@ app.layout = html.Div(
                                     children=[
                                         dl.TileLayer(
                                             id="base-tile-layer",
-                                            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                                            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
                                             attribution="&copy; OpenStreetMap contributors &copy; CARTO",
                                         ),
                                         dl.LayerGroup(
@@ -729,8 +765,8 @@ def toggle_theme(n_clicks, current_theme):
 )
 def sync_map_tiles_with_theme(theme):
     if theme == "light":
-        return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+    return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
 
 
 # 2. Map Click vs Context Menu
@@ -923,15 +959,22 @@ def update_route_endpoints(context_start, context_end, start_btn, end_btn, start
     Input("start-store", "data"),
     Input("end-store", "data"),
     Input("mode-select", "value"),
-    Input("places-store", "data")
+    Input("places-store", "data"),
+    Input("map", "bounds"),
 )
-def calculate_and_draw(start, end, mode, places):
+def calculate_and_draw(start, end, mode, places, map_bounds):
     start_layer = None
     end_layer = None
     route_layer = None
     info = None
-    sanctuary_markers = GLOBAL_SANCTUARY_MARKERS
-    user_markers = create_user_markers(places or [])
+    visible_sanctuaries = filter_points_in_bounds(
+        SANCTUARIES, map_bounds, MAX_VISIBLE_SANCTUARIES
+    )
+    visible_user_places = filter_points_in_bounds(
+        places or [], map_bounds, MAX_VISIBLE_USER_PLACES
+    )
+    sanctuary_markers = create_sanctuary_markers(visible_sanctuaries)
+    user_markers = create_user_markers(visible_user_places)
     loading_dummy = ""
 
     if start:
