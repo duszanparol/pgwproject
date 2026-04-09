@@ -34,8 +34,8 @@ SANCTUARY_CLUSTER_ZOOM_THRESHOLD = 9
 
 SANCTUARY_ICON = {
     "iconUrl": "/assets/christian-cross-svgrepo-com.svg",
-    "iconSize": [38, 38],
-    "iconAnchor": [19, 38],
+    "iconSize": [24, 24],
+    "iconAnchor": [12, 24],
 }
 
 USER_PLACE_ICON = {
