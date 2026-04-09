@@ -30,6 +30,7 @@ MODE_META = {
 
 MAX_VISIBLE_SANCTUARIES = 700
 MAX_VISIBLE_USER_PLACES = 300
+SANCTUARY_CLUSTER_ZOOM_THRESHOLD = 9
 
 SANCTUARY_ICON = {
     "iconUrl": "/assets/christian-cross-svgrepo-com.svg",
@@ -435,6 +436,28 @@ def create_sanctuary_markers(sanctuaries):
     return markers
 
 
+def build_sanctuary_layer_children(sanctuaries, zoom):
+    markers = create_sanctuary_markers(sanctuaries)
+    if zoom is None:
+        zoom = DEFAULT_ZOOM
+
+    if float(zoom) <= SANCTUARY_CLUSTER_ZOOM_THRESHOLD:
+        return [
+            dl.MarkerClusterGroup(
+                id="sanctuary-cluster-group",
+                children=markers,
+                options={
+                    "showCoverageOnHover": False,
+                    "spiderfyOnMaxZoom": True,
+                    "maxClusterRadius": 65,
+                    "disableClusteringAtZoom": SANCTUARY_CLUSTER_ZOOM_THRESHOLD + 1,
+                },
+            )
+        ]
+
+    return markers
+
+
 def filter_points_in_bounds(points, bounds, limit=None):
     if not bounds or len(bounds) != 2:
         return points[:limit] if limit else points
@@ -457,7 +480,6 @@ sanctuary_catalog = load_sanctuaries()
 SANCTUARIES = sanctuary_catalog["items"]
 SANCTUARY_GEOJSON = sanctuary_catalog["geojson"]
 INITIAL_PLACES = load_places()
-GLOBAL_SANCTUARY_MARKERS = create_sanctuary_markers(SANCTUARIES)
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 
@@ -639,7 +661,10 @@ app.layout = html.Div(
                                         ),
                                         dl.LayerGroup(
                                             id="sanctuary-markers-layer",
-                                            children=GLOBAL_SANCTUARY_MARKERS,
+                                            children=build_sanctuary_layer_children(
+                                                SANCTUARIES,
+                                                DEFAULT_ZOOM,
+                                            ),
                                         ),
                                         dl.LayerGroup(
                                             id="user-markers-layer",
@@ -961,8 +986,9 @@ def update_route_endpoints(context_start, context_end, start_btn, end_btn, start
     Input("mode-select", "value"),
     Input("places-store", "data"),
     Input("map", "bounds"),
+    Input("map", "zoom"),
 )
-def calculate_and_draw(start, end, mode, places, map_bounds):
+def calculate_and_draw(start, end, mode, places, map_bounds, map_zoom):
     start_layer = None
     end_layer = None
     route_layer = None
@@ -973,7 +999,7 @@ def calculate_and_draw(start, end, mode, places, map_bounds):
     visible_user_places = filter_points_in_bounds(
         places or [], map_bounds, MAX_VISIBLE_USER_PLACES
     )
-    sanctuary_markers = create_sanctuary_markers(visible_sanctuaries)
+    sanctuary_markers = build_sanctuary_layer_children(visible_sanctuaries, map_zoom)
     user_markers = create_user_markers(visible_user_places)
     loading_dummy = ""
 
