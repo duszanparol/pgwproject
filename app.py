@@ -490,15 +490,6 @@ def generalize_sanctuaries_by_grid(sanctuaries, zoom):
     return clusters
 
 
-def build_cluster_cross_icon(count):
-    size = min(42 + int(count ** 0.5) * 3, 64)
-    return {
-        "iconUrl": SANCTUARY_ICON["iconUrl"],
-        "iconSize": [size, size],
-        "iconAnchor": [size // 2, size],
-    }
-
-
 def build_sanctuary_layer_children(sanctuaries, zoom):
     markers = create_sanctuary_markers(sanctuaries)
     if zoom is None:
@@ -513,9 +504,14 @@ def build_sanctuary_layer_children(sanctuaries, zoom):
                 continue
 
             generalized_markers.append(
-                dl.Marker(
-                    position=[c["lat"], c["lon"]],
-                    icon=build_cluster_cross_icon(c["count"]),
+                dl.CircleMarker(
+                    center=[c["lat"], c["lon"]],
+                    radius=min(11 + int(c["count"] ** 0.5) * 2, 24),
+                    color="#FF8C00",
+                    fill=True,
+                    fillColor="#000000",
+                    fillOpacity=0.85,
+                    weight=2,
                     children=[
                         dl.Tooltip(f"{c['count']} sanktuariow", className="fw-bold"),
                         dl.Popup(
