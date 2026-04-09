@@ -436,24 +436,105 @@ def create_sanctuary_markers(sanctuaries):
     return markers
 
 
+def get_generalization_cell_size(zoom):
+    if zoom is None:
+        zoom = DEFAULT_ZOOM
+    z = float(zoom)
+    if z <= 5:
+        return 1.2
+    if z <= 6:
+        return 0.8
+    if z <= 7:
+        return 0.45
+    if z <= 8:
+        return 0.28
+    return 0.18
+
+
+def generalize_sanctuaries_by_grid(sanctuaries, zoom):
+    if not sanctuaries:
+        return []
+
+    cell = get_generalization_cell_size(zoom)
+    buckets = {}
+
+    for s in sanctuaries:
+        lat = float(s.get("lat", 0))
+        lon = float(s.get("lon", 0))
+        key = (int(lat / cell), int(lon / cell))
+        bucket = buckets.setdefault(
+            key,
+            {
+                "lat_sum": 0.0,
+                "lon_sum": 0.0,
+                "count": 0,
+                "items": [],
+            },
+        )
+        bucket["lat_sum"] += lat
+        bucket["lon_sum"] += lon
+        bucket["count"] += 1
+        bucket["items"].append(s)
+
+    clusters = []
+    for key, bucket in buckets.items():
+        clusters.append(
+            {
+                "id": f"grid-{key[0]}-{key[1]}",
+                "lat": bucket["lat_sum"] / bucket["count"],
+                "lon": bucket["lon_sum"] / bucket["count"],
+                "count": bucket["count"],
+                "items": bucket["items"],
+            }
+        )
+    return clusters
+
+
 def build_sanctuary_layer_children(sanctuaries, zoom):
     markers = create_sanctuary_markers(sanctuaries)
     if zoom is None:
         zoom = DEFAULT_ZOOM
 
     if float(zoom) <= SANCTUARY_CLUSTER_ZOOM_THRESHOLD:
-        return [
-            dl.MarkerClusterGroup(
-                id="sanctuary-cluster-group",
-                children=markers,
-                options={
-                    "showCoverageOnHover": False,
-                    "spiderfyOnMaxZoom": True,
-                    "maxClusterRadius": 65,
-                    "disableClusteringAtZoom": SANCTUARY_CLUSTER_ZOOM_THRESHOLD + 1,
-                },
+        clusters = generalize_sanctuaries_by_grid(sanctuaries, zoom)
+        generalized_markers = []
+        for c in clusters:
+            if c["count"] == 1:
+                generalized_markers.extend(create_sanctuary_markers(c["items"]))
+                continue
+
+            radius = min(10 + int(c["count"] ** 0.5) * 2, 24)
+            generalized_markers.append(
+                dl.CircleMarker(
+                    center=[c["lat"], c["lon"]],
+                    radius=radius,
+                    color="#FF8C00",
+                    fill=True,
+                    fillColor="#FFB347",
+                    fillOpacity=0.85,
+                    weight=2,
+                    children=[
+                        dl.Tooltip(f"{c['count']} sanktuariow", className="fw-bold"),
+                        dl.Popup(
+                            html.Div(
+                                [
+                                    html.H6("Punkt zagregowany", className="mb-2 text-warning"),
+                                    html.Div(
+                                        f"Liczba sanktuariow: {c['count']}",
+                                        className="small mb-2",
+                                    ),
+                                    html.Div(
+                                        "Przybliz mape, aby zobaczyc i wybrac konkretne sanktuarium.",
+                                        className="small text-muted",
+                                    ),
+                                ],
+                                style={"minWidth": "220px"},
+                            )
+                        ),
+                    ],
+                )
             )
-        ]
+        return generalized_markers
 
     return markers
 
