@@ -490,6 +490,17 @@ def generalize_sanctuaries_by_grid(sanctuaries, zoom):
     return clusters
 
 
+def sanctuary_count_label(count):
+    if count == 1:
+        return "1 sanktuarium"
+
+    last_two = count % 100
+    last_digit = count % 10
+    if last_digit in (2, 3, 4) and last_two not in (12, 13, 14):
+        return f"{count} sanktuaria"
+    return f"{count} sanktuariów"
+
+
 def build_sanctuary_layer_children(sanctuaries, zoom):
     markers = create_sanctuary_markers(sanctuaries)
     if zoom is None:
@@ -513,13 +524,13 @@ def build_sanctuary_layer_children(sanctuaries, zoom):
                     fillOpacity=0.85,
                     weight=2,
                     children=[
-                        dl.Tooltip(f"{c['count']} sanktuariow", className="fw-bold"),
+                        dl.Tooltip(sanctuary_count_label(c["count"]), className="fw-bold"),
                         dl.Popup(
                             html.Div(
                                 [
                                     html.H6("Punkt zagregowany", className="mb-2 text-warning"),
                                     html.Div(
-                                        f"Liczba sanktuariow: {c['count']}",
+                                        f"Liczba sanktuariów: {c['count']}",
                                         className="small mb-2",
                                     ),
                                     html.Div(
