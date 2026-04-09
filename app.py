@@ -13,7 +13,7 @@ from dash.exceptions import PreventUpdate
 
 APP_TITLE = "Projekt PGW"
 DEFAULT_CENTER = [52.06, 19.25]
-DEFAULT_ZOOM = 6.75
+DEFAULT_ZOOM = 6.85
 HTTP_TIMEOUT = float(os.getenv("CAMMINO_HTTP_TIMEOUT", "5"))
 VALHALLA_URL = os.getenv("VALHALLA_URL", "https://valhalla1.openstreetmap.de/route")
 SANCTUARIES_URL = os.getenv(
@@ -34,8 +34,8 @@ SANCTUARY_CLUSTER_ZOOM_THRESHOLD = 9
 
 SANCTUARY_ICON = {
     "iconUrl": "/assets/christian-cross-svgrepo-com.svg",
-    "iconSize": [26, 26],
-    "iconAnchor": [13, 26],
+    "iconSize": [38, 38],
+    "iconAnchor": [19, 38],
 }
 
 USER_PLACE_ICON = {
@@ -490,6 +490,15 @@ def generalize_sanctuaries_by_grid(sanctuaries, zoom):
     return clusters
 
 
+def build_cluster_cross_icon(count):
+    size = min(42 + int(count ** 0.5) * 3, 64)
+    return {
+        "iconUrl": SANCTUARY_ICON["iconUrl"],
+        "iconSize": [size, size],
+        "iconAnchor": [size // 2, size],
+    }
+
+
 def build_sanctuary_layer_children(sanctuaries, zoom):
     markers = create_sanctuary_markers(sanctuaries)
     if zoom is None:
@@ -503,16 +512,10 @@ def build_sanctuary_layer_children(sanctuaries, zoom):
                 generalized_markers.extend(create_sanctuary_markers(c["items"]))
                 continue
 
-            radius = min(10 + int(c["count"] ** 0.5) * 2, 24)
             generalized_markers.append(
-                dl.CircleMarker(
-                    center=[c["lat"], c["lon"]],
-                    radius=radius,
-                    color="#FF8C00",
-                    fill=True,
-                    fillColor="#FFB347",
-                    fillOpacity=0.85,
-                    weight=2,
+                dl.Marker(
+                    position=[c["lat"], c["lon"]],
+                    icon=build_cluster_cross_icon(c["count"]),
                     children=[
                         dl.Tooltip(f"{c['count']} sanktuariow", className="fw-bold"),
                         dl.Popup(
