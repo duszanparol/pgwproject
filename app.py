@@ -1009,99 +1009,141 @@ def preview_image(contents):
 
 
 # 4. Set Start / End points (Routing logic)
+def _is_real_click():
+    if not ctx.triggered:
+        return False
+    value = ctx.triggered[0].get("value")
+    return bool(value and value != 0)
+
+
+def _resolve_point_from_trigger(trigger, places):
+    if not trigger:
+        return None, None
+
+    if trigger["type"].startswith("context-"):
+        parts = trigger["index"].split(",", 2)
+        point = {"lat": float(parts[0]), "lon": float(parts[1])}
+        display_name = (
+            parts[2]
+            if len(parts) > 2 and parts[2] != "Wybrane miejsce"
+            else f"{point['lat']:.4f}, {point['lon']:.4f}"
+        )
+        return point, display_name
+
+    place_id = trigger["index"]
+    place = next((p for p in places if p["id"] == place_id), None)
+    if not place:
+        place = next((p for p in SANCTUARIES if p["id"] == place_id), None)
+    if not place:
+        return None, None
+
+    point = {"lat": place["lat"], "lon": place["lon"], "id": place["id"]}
+    return point, place.get("name", "Wybrane miejsce")
+
+
 @app.callback(
     Output("start-store", "data"),
-    Output("end-store", "data"),
     Output("start-display", "value"),
+    Input({"type": "context-start", "index": ALL}, "n_clicks"),
+    Input({"type": "set-start-btn", "index": ALL}, "n_clicks"),
+    State("places-store", "data"),
+    prevent_initial_call=True
+)
+def update_start_endpoint(context_start, start_btn, places):
+    trigger = ctx.triggered_id
+    if not trigger or not _is_real_click():
+        raise PreventUpdate
+
+    point, display_name = _resolve_point_from_trigger(trigger, places or [])
+    if not point:
+        raise PreventUpdate
+
+    return point, display_name
+
+
+@app.callback(
+    Output("end-store", "data"),
     Output("end-display", "value"),
+    Input({"type": "context-end", "index": ALL}, "n_clicks"),
+    Input({"type": "set-end-btn", "index": ALL}, "n_clicks"),
+    State("places-store", "data"),
+    prevent_initial_call=True
+)
+def update_end_endpoint(context_end, end_btn, places):
+    trigger = ctx.triggered_id
+    if not trigger or not _is_real_click():
+        raise PreventUpdate
+
+    point, display_name = _resolve_point_from_trigger(trigger, places or [])
+    if not point:
+        raise PreventUpdate
+
+    return point, display_name
+
+
+@app.callback(
     Output("context-menu-layer", "children", allow_duplicate=True),
     Input({"type": "context-start", "index": ALL}, "n_clicks"),
     Input({"type": "context-end", "index": ALL}, "n_clicks"),
     Input({"type": "set-start-btn", "index": ALL}, "n_clicks"),
     Input({"type": "set-end-btn", "index": ALL}, "n_clicks"),
-    State("start-store", "data"),
-    State("end-store", "data"),
-    State("start-display", "value"),
-    State("end-display", "value"),
-    State("places-store", "data"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
-def update_route_endpoints(context_start, context_end, start_btn, end_btn, start_store, end_store, start_disp, end_disp, places):
-    trigger = ctx.triggered_id
-    if not trigger:
+def close_context_menu_after_selection(context_start, context_end, start_btn, end_btn):
+    if not _is_real_click():
         raise PreventUpdate
-
-    # Dash fires callbacks initially for all dynamyc components when they are created.
-    # Therefore we must check if any of the dynamic buttons was ACTUALLY clicked.
-    triggered_inputs = [ctx.triggered[0]["value"]] if ctx.triggered else [None]
-    if not triggered_inputs[0] or triggered_inputs[0] == 0:
-        raise PreventUpdate
-
-    is_start = "start" in trigger["type"]
-
-    if trigger["type"].startswith("context-"):
-        # Map arbitrary click
-        parts = trigger["index"].split(",", 2)
-        point = {"lat": float(parts[0]), "lon": float(parts[1])}
-        display_name = parts[2] if len(parts) > 2 and parts[2] != "Wybrane miejsce" else f"{point['lat']:.4f}, {point['lon']:.4f}"
-    else:
-        # Existing place or sanctuary click
-        place_id = trigger["index"]
-        place = next((p for p in places if p["id"] == place_id), None)
-        if not place:
-            place = next((p for p in SANCTUARIES if p["id"] == place_id), None)
-            
-        if not place:
-            raise PreventUpdate
-            
-        point = {"lat": place["lat"], "lon": place["lon"], "id": place["id"]}
-        display_name = place.get("name", "Wybrane miejsce")
-        
-    if is_start:
-        return point, end_store, display_name, end_disp, None
-    else:
-        return start_store, point, start_disp, display_name, None
+    return None
 
 
 # 5. Draw icons and route
 @app.callback(
     Output("start-icon-layer", "children"),
     Output("end-icon-layer", "children"),
+    Input("start-store", "data"),
+    Input("end-store", "data"),
+)
+def draw_endpoint_icons(start, end):
+    start_layer = None
+    end_layer = None
+
+    if start:
+        start_layer = [
+            dl.CircleMarker(
+                center=[start["lat"], start["lon"]],
+                radius=8,
+                color="#28a745",
+                weight=2,
+                fillOpacity=1,
+            )
+        ]
+    if end:
+        end_layer = [
+            dl.CircleMarker(
+                center=[end["lat"], end["lon"]],
+                radius=8,
+                color="#007bff",
+                weight=2,
+                fillOpacity=1,
+            )
+        ]
+
+    return start_layer, end_layer
+
+
+@app.callback(
     Output("route-layer", "children"),
     Output("route-info", "children"),
-    Output("sanctuary-markers-layer", "children"),
-    Output("user-markers-layer", "children"),
     Output("loading-output", "children"),
     Input("start-store", "data"),
     Input("end-store", "data"),
     Input("mode-select", "value"),
-    Input("places-store", "data"),
-    Input("map", "bounds"),
-    Input("map", "zoom"),
 )
-def calculate_and_draw(start, end, mode, places, map_bounds, map_zoom):
-    start_layer = None
-    end_layer = None
+def draw_route_and_info(start, end, mode):
     route_layer = None
     info = None
-    visible_sanctuaries = filter_points_in_bounds(
-        SANCTUARIES, map_bounds, MAX_VISIBLE_SANCTUARIES
-    )
-    visible_user_places = filter_points_in_bounds(
-        places or [], map_bounds, MAX_VISIBLE_USER_PLACES
-    )
-    sanctuary_markers = build_sanctuary_layer_children(visible_sanctuaries, map_zoom)
-    user_markers = create_user_markers(visible_user_places)
     loading_dummy = ""
 
-    if start:
-        start_layer = [dl.CircleMarker(center=[start["lat"], start["lon"]], radius=8, color="#28a745", weight=2, fillOpacity=1)]
-    if end:
-        end_layer = [dl.CircleMarker(center=[end["lat"], end["lon"]], radius=8, color="#007bff", weight=2, fillOpacity=1)]
-        
     if start and end:
-        sanctuary_markers = []
-        user_markers = []
         try:
             route = get_route(start, end, mode)
             route_layer = [dl.Polyline(
@@ -1149,7 +1191,31 @@ def calculate_and_draw(start, end, mode, places, map_bounds, map_zoom):
         except Exception as e:
             info = dbc.Alert(f"Błąd wyznaczania trasy: {e}", color="danger", className="mt-2 p-2 small")
 
-    return start_layer, end_layer, route_layer, info, sanctuary_markers, user_markers, loading_dummy
+    return route_layer, info, loading_dummy
+
+
+@app.callback(
+    Output("sanctuary-markers-layer", "children"),
+    Output("user-markers-layer", "children"),
+    Input("start-store", "data"),
+    Input("end-store", "data"),
+    Input("places-store", "data"),
+    Input("map", "bounds"),
+    Input("map", "zoom"),
+)
+def draw_point_layers(start, end, places, map_bounds, map_zoom):
+    if start and end:
+        return [], []
+
+    visible_sanctuaries = filter_points_in_bounds(
+        SANCTUARIES, map_bounds, MAX_VISIBLE_SANCTUARIES
+    )
+    visible_user_places = filter_points_in_bounds(
+        places or [], map_bounds, MAX_VISIBLE_USER_PLACES
+    )
+    sanctuary_markers = build_sanctuary_layer_children(visible_sanctuaries, map_zoom)
+    user_markers = create_user_markers(visible_user_places)
+    return sanctuary_markers, user_markers
 
 
 @app.callback(
